@@ -1,0 +1,357 @@
+# Moments
+
+#===============#
+# Model Moments #
+#===============#
+#================#
+# Default #
+#================#
+# Unconditional
+# Singles
+fraction_S_default = sum(σ_S[1,:,:,:,:].*μ_S)*100
+# Couples
+# fraction_C_default = sum(dropdims(sum(σ_C[1,:,:,:,:,:,:,:],dims=[1 2]),dims=(1,2)).*μ_C)*100
+
+# Across z
+# Singles
+fraction_S_default_z = zeros(parameters.z_size)
+for i in 1:parameters.z_size
+    fraction_S_default_z[i] = sum(σ_S[1,:,i,:,:].*μ_S[:,i,:,:])/sum(μ_S[:,i,:,:])*100
+end
+# Couples
+# fraction_C_default_z = zeros(parameters.z_size,parameters.z_size)
+# for i in 1:parameters.z_size, j in 1:parameters.z_size
+#     fraction_C_default_z[i,j] = sum(dropdims(sum(σ_C[1,:,:,:,i,j,:,:],dims=[1 2]),dims=(1,2)).*μ_C[:,i,j,:,:])/sum(μ_C[:,i,j,:,:])*100
+# end
+#
+# fraction_C_default_z_reduced = zeros(parameters.z_size)
+# for i in 1:parameters.z_size
+#     fraction_C_default_z_reduced[i] = sum(dropdims(sum(σ_C[1,:,:,:,i,:,:,:],dims=[1 2]),dims=(1,2)).*μ_C[:,i,:,:,:])/sum(μ_C[:,i,:,:,:])*100
+# end
+
+# # Across z
+# fraction_full_default_e = zeros(parameters.e_size)
+# for i in 1:parameters.e_size
+#     fraction_full_default_e[i] = sum(σ[1,:,i,:,:].*μ[:,i,:,:])/sum(μ[:,i,:,:])*100
+# end
+#
+# # Across η
+# fraction_full_default_β = zeros(parameters.β_size)
+# for i in 1:parameters.β_size
+#     fraction_full_default_β[i] = sum(σ[1,i,:,:,:].*μ[i,:,:,:])/sum(μ[i,:,:,:])*100
+# end
+
+#=============================#
+# Fraction of loan users #
+#=============================#
+# Unconditional
+# Singles
+a_i = [(parameters.a_grid .< 0.0)][1]
+# fraction_S_loan_users = sum(μ_S[a_i,:,:,:])*100
+
+fraction_S_loan_users = sum(μ_S[1:parameters.a_ind_zero-1,:,:,:])*100
+
+# Couples
+# fraction_C_loan_users = sum(μ_C[a_i,:,:,:,:])*100
+
+# a_p_i = [(parameters.a_grid .< 0.0)][1]
+# σ_S_temp = σ_S[2:end,:,:,:,:,:]
+# fraction_S_loan_users = sum(dropdims(sum(σ_S_temp[a_p_i,:,:,:,:,:],dims=[1 2]),dims=(1,2)).*μ_S)*100
+
+# Across z
+# Singles
+fraction_S_loan_users_z = zeros(parameters.z_size)
+for i in 1:parameters.z_size
+    fraction_S_loan_users_z[i] = sum(μ_S[a_i,i,:,:])/sum(μ_S[:,i,:,:])*100
+end
+# Couples
+# fraction_C_loan_users_z = zeros(parameters.z_size,parameters.z_size)
+# for i in 1:parameters.z_size, j in 1:parameters.z_size
+#     fraction_C_loan_users_z[i,j] = sum(μ_C[a_i,i,j,:,:])/sum(μ_C[:,i,j,:,:])*100
+# end
+#
+# fraction_C_loan_users_z_reduced = zeros(parameters.z_size)
+# for i in 1:parameters.z_size
+#     fraction_C_loan_users_z_reduced[i] = sum(μ_C[a_i,i,:,:,:])/sum(μ_C[:,i,:,:,:])*100
+# end
+
+# Across η
+# Singles
+a_p_i = [(parameters.a_grid .< 0.0)][1]
+σ_S_temp = σ_S[2:end,:,:,:,:]
+
+fraction_S_loan_users_η = zeros(parameters.η_size)
+for i in 1:parameters.η_size
+    fraction_S_loan_users_η[i] = sum(dropdims(sum(σ_S_temp[a_p_i,:,:,i,:],dims=[1]),dims=(1)).*μ_S[:,:,i,:])/sum(μ_S[:,:,i,:])*100
+end
+
+# Couples
+# σ_C_temp = σ_C[2:end,:,:,:,:,:,:,:]
+#
+# fraction_C_loan_users_η = zeros(parameters.η_size, parameters.η_size)
+# for i in 1:parameters.η_size, j in 1:parameters.η_size
+#     fraction_C_loan_users_η[i,j] = sum(dropdims(sum(σ_C_temp[a_p_i,:,:,:,:,:,i,j],dims=[1 2 3]),dims=(1,2,3)).*μ_C[:,:,:,i,j])/sum(μ_C[:,:,:,i,j])*100
+# end
+
+#=============================#
+# Average interest rate       #
+#=============================#
+# Singles
+global num_S = 0.0
+global den_S = 0.0
+global num_total_S = 0.0
+global den_total_S = 0.0
+
+for κ_i in 1:parameters.κ_size, η_i in 1:parameters.η_size, z_i in 1:parameters.z_size, a_i in 1:parameters.a_size, a_p_i in 1:parameters.a_size
+
+    global num_total_S += q_S[a_p_i,z_i]*σ_S[a_p_i+1,a_i,z_i,η_i,κ_i]*μ_S[a_i,z_i,η_i,κ_i]
+    global den_total_S += σ_S[a_p_i+1,a_i,z_i,η_i,κ_i]*μ_S[a_i,z_i,η_i,κ_i]
+
+    if a_p_i < parameters.a_ind_zero
+        global num_S += q_S[a_p_i,z_i]*σ_S[a_p_i+1,a_i,z_i,η_i,κ_i]*μ_S[a_i,z_i,η_i,κ_i]
+        global den_S += σ_S[a_p_i+1,a_i,z_i,η_i,κ_i]*μ_S[a_i,z_i,η_i,κ_i]
+    end
+end
+
+ave_S_price = num_S/den_S
+ave_S_rate = ((1.0/ave_S_price) - 1.0)*100
+
+ave_S_price_total = num_total_S/den_total_S
+ave_S_rate_total = ((1.0/ave_S_price_total) - 1.0)*100
+
+# Couples
+# global num_C = 0.0
+# global den_C = 0.0
+# global num_total_C = 0.0
+# global den_total_C = 0.0
+#
+# for η_2_i in 1:parameters.η_size, η_1_i in 1:parameters.η_size, z_2_i in 1:parameters.z_size, z_1_i in 1:parameters.z_size, a_i in 1:parameters.a_size, a_p_i in 1:parameters.a_size
+#
+#     global num_total_C += q_C[a_p_i,z_1_i,z_2_i]*sum(σ_C[a_p_i+1,:,:,a_i,z_1_i,z_2_i,η_1_i,η_2_i])*μ_C[a_i,z_1_i,z_2_i,η_1_i,η_2_i]
+#     global den_total_C += sum(σ_C[a_p_i+1,:,:,a_i,z_1_i,z_2_i,η_1_i,η_2_i])*μ_C[a_i,z_1_i,z_2_i,η_1_i,η_2_i]
+#
+#     if a_p_i < parameters.a_ind_zero
+#         global num_C += q_C[a_p_i,z_1_i,z_2_i]*sum(σ_C[a_p_i+1,:,:,a_i,z_1_i,z_2_i,η_1_i,η_2_i])*μ_C[a_i,z_1_i,z_2_i,η_1_i,η_2_i]
+#         global den_C += sum(σ_C[a_p_i+1,:,:,a_i,z_1_i,z_2_i,η_1_i,η_2_i])*μ_C[a_i,z_1_i,z_2_i,η_1_i,η_2_i]
+#     end
+# end
+#
+# ave_C_price = num_C/den_C
+# ave_C_rate = ((1.0/ave_C_price) - 1.0)*100
+#
+# ave_C_price_total = num_total_C/den_total_C
+# ave_C_rate_total = ((1.0/ave_C_price_total) - 1.0)*100
+
+#=============================#
+#       Ex-ante Welfare       #
+#=============================#
+# Singles
+# Women
+welfare_S_women = 0.0
+
+# Newborns born only with different η
+# for η_i in 1:parameters.η_size
+#     global welfare_S += parameters.Γ_η[η_i]*W_S[parameters.a_ind_zero,2,η_i,1]
+# end
+
+# Newborns born with different eta and z
+# for η_i in 1:parameters.η_size, z_i in 1:parameters.z_size
+#     global welfare_S += parameters.Γ_η[η_i]*parameters.Γ_z[2,z_i]*W_S[parameters.a_ind_zero,z_i,η_i,1]
+# end
+
+for z_i in 1:parameters.z_size
+    global welfare_S_women += parameters.Γ_z_initial[z_i]*V_S[parameters.a_ind_zero,z_i,1,1,1]
+end
+
+# Men
+welfare_S_men = 0.0
+
+for z_i in 1:parameters.z_size
+    global welfare_S_men += parameters.Γ_z_initial[z_i]*V_S[parameters.a_ind_zero,z_i,1,1,2]
+end
+
+# Newborns born with different z and κ
+# for η_i in 1:parameters.η_size, z_i in 1:parameters.z_size, κ_i in 1:parameters.κ_size
+#     global welfare_S += parameters.Γ_η[η_i]*parameters.Γ_z[2,z_i]*parameters.Γ_κ[κ_i]*W_S[parameters.a_ind_zero,z_i,η_i,κ_i]
+# end
+
+# Newborns can also be born with assets
+# for a_i in 1:parameters.a_size, η_i in 1:parameters.η_size, z_i in 1:parameters.z_size, κ_i in 1:parameters.κ_size
+#     global welfare_S += parameters.Γ_η[η_i]*parameters.Γ_z[2,z_i]*parameters.Γ_κ[κ_i]*parameters.μ_asset_newborns[a_i]*W_S[a_i,z_i,η_i,κ_i]
+# end
+
+# for η_i in 1:parameters.η_size, z_i in 1:parameters.z_size, κ_i in 1:parameters.κ_size
+#     global welfare_S += parameters.Γ_η[η_i]*parameters.Γ_z_initial[z_i]*parameters.Γ_κ[κ_i]*W_S[parameters.a_ind_zero,z_i,η_i,κ_i,1]
+# end
+
+# Couples
+welfare_C = 0.0
+
+for z_1_i in 1:parameters.z_size, z_2_i in 1:parameters.z_size
+    global welfare_C += parameters.Γ_z_initial[z_1_i]*parameters.Γ_z_initial[z_2_i]*V_C[parameters.a_ind_zero,z_1_i,z_2_i,1,1,1]
+end
+
+# welfare_S_fix = variables.W_S[parameters.a_ind_zero,3,2,1,1]
+
+# welfare_C_fix = W_C[parameters.a_ind_zero,2,2,2,2]
+
+# Distribution-weighted
+welfare_S_weighted = sum(μ_S.*W_S)
+
+#=============================#
+#         CEV Welfare         #
+#=============================#
+
+# Collect moments
+moments = [
+      fraction_S_default
+      fraction_S_loan_users
+      fraction_S_loan_users_z[1]
+      fraction_S_loan_users_z[2]
+      fraction_S_loan_users_z[3]
+      fraction_S_loan_users_η[1]
+      fraction_S_loan_users_η[2]
+      fraction_S_loan_users_η[3]
+      ave_S_rate
+      ave_S_rate_total
+      welfare_S
+      welfare_S_fix
+      welfare_S_weighted
+      ]
+
+# @save "moments.jld2" moments
+
+#=========================================#
+#    Individual Welfare within Couples    #
+#=========================================#
+
+V_C_1 = zeros(parameters.a_size, parameters.z_size, parameters.z_size, parameters.κ_size, parameters.κ_size, parameters.lifespan)
+
+V_C_2 = zeros(parameters.a_size, parameters.z_size, parameters.z_size, parameters.κ_size, parameters.κ_size, parameters.lifespan)
+
+for age in parameters.lifespan:-1:1
+
+    if age != parameters.lifespan
+        V_expect_C_1_mat =reshape(V_C_1[:,:,:,:,:,age+1],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),kron(reshape(parameters.Γ_κ,1,:),kron(parameters.Γ_z[:,:,2],parameters.Γ_z[:,:,1]))))
+
+        V_expect_C_2_mat =reshape(V_C_2[:,:,:,:,:,age+1],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),kron(reshape(parameters.Γ_κ,1,:),kron(parameters.Γ_z[:,:,2],parameters.Γ_z[:,:,1]))))
+
+        V_expect_div_mat_women = reshape(V_div[:,:,:,age+1,1],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),parameters.Γ_z[:,:,1]))
+
+        V_expect_div_mat_men = reshape(V_div[:,:,:,age+1,2],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),parameters.Γ_z[:,:,2]))
+    end
+
+    for κ_2_i in 1:parameters.κ_size, κ_1_i in 1:parameters.κ_size, z_2_i in 1:parameters.z_size, z_1_i in 1:parameters.z_size, a_i in 1:parameters.a_size
+
+        z_i = LinearIndices(parameters.Γ_z[:,:,1])[z_1_i,z_2_i]
+
+        a_p = parameters.a_grid[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]]
+
+        if a_p/2 in parameters.a_grid
+            a_p_i_half_1 = findfirst(parameters.a_grid .== a_p/2)
+            a_p_i_half_2 = a_p_i_half_1
+        else
+            a_p_i_half_1 = findlast(parameters.a_grid .< a_p/2)
+            a_p_i_half_2 = findfirst(parameters.a_grid .> a_p/2)
+        end
+
+        # Compute consumption
+        if d_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age] == 2 # Default
+            @inbounds x = (parameters.z_grid[z_1_i,1]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,1]]+parameters.z_grid[z_2_i,2]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,2]])*(1.0-parameters.ϕ)
+
+            # With economies of scale
+            c = x/(2^(1/parameters.ρ_s))
+        else # Repayment
+            @inbounds x = parameters.z_grid[z_1_i,1]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,1]]+parameters.z_grid[z_2_i,2]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,2]]+parameters.a_grid[a_i]-q_C[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age],z_1_i,z_2_i,age]*parameters.a_grid[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]]-parameters.κ_grid[age,1,κ_1_i]-parameters.κ_grid[age,1,κ_2_i]
+
+            # With economies of scale
+            c = x/(2^(1/parameters.ρ_s))
+        end
+
+        # Compute leisure
+        l_1 = parameters.T - parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,1]]
+        l_2 = parameters.T - parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,2]]
+
+        if age==parameters.lifespan
+            V_C_1[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_1)
+            V_C_2[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_2)
+        else
+            V_C_1[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_1) + parameters.β*(1-parameters.ψ)*V_expect_C_1_mat[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age],z_i] + parameters.β*parameters.ψ*(V_expect_div_mat_women[a_p_i_half_1, z_1_i])
+
+            V_C_2[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_2) + parameters.β*(1-parameters.ψ)*V_expect_C_2_mat[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age],z_i] + parameters.β*parameters.ψ*(V_expect_div_mat_men[a_p_i_half_2, z_2_i])
+        end
+    end
+end
+
+# Equal division of assets upon divorce
+V_C_1 = zeros(parameters.a_size, parameters.z_size, parameters.z_size, parameters.κ_size, parameters.κ_size, parameters.lifespan)
+
+V_C_2 = zeros(parameters.a_size, parameters.z_size, parameters.z_size, parameters.κ_size, parameters.κ_size, parameters.lifespan)
+
+for age in parameters.lifespan:-1:1
+
+    if age != parameters.lifespan
+        V_expect_C_1_mat =reshape(V_C_1[:,:,:,:,:,age+1],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),kron(reshape(parameters.Γ_κ,1,:),kron(parameters.Γ_z[:,:,2],parameters.Γ_z[:,:,1]))))
+
+        V_expect_C_2_mat =reshape(V_C_2[:,:,:,:,:,age+1],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),kron(reshape(parameters.Γ_κ,1,:),kron(parameters.Γ_z[:,:,2],parameters.Γ_z[:,:,1]))))
+
+        V_expect_div_mat_women = reshape(V_div[:,:,:,age+1,1],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),parameters.Γ_z[:,:,1]))
+
+        V_expect_div_mat_men = reshape(V_div[:,:,:,age+1,2],parameters.a_size,:)*transpose(kron(reshape(parameters.Γ_κ,1,:),parameters.Γ_z[:,:,2]))
+    end
+
+    for κ_2_i in 1:parameters.κ_size, κ_1_i in 1:parameters.κ_size, z_2_i in 1:parameters.z_size, z_1_i in 1:parameters.z_size, a_i in 1:parameters.a_size
+
+        z_i = LinearIndices(parameters.Γ_z[:,:,1])[z_1_i,z_2_i]
+
+        a_p = parameters.a_grid[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]]
+
+        if a_p/2 in parameters.a_grid
+            a_p_i_half_1 = findfirst(parameters.a_grid .== a_p/2)
+            a_p_i_half_2 = a_p_i_half_1
+        else
+            a_p_i_half_1 = findlast(parameters.a_grid .< a_p/2)
+            a_p_i_half_2 = findfirst(parameters.a_grid .> a_p/2)
+        end
+
+        # Compute consumption
+        if d_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age] == 2 # Default
+            @inbounds x = (parameters.z_grid[z_1_i,1]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,1]]+parameters.z_grid[z_2_i,2]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,2]])*(1.0-parameters.ϕ)
+
+            # With economies of scale
+            c = x/(2^(1/parameters.ρ_s))
+        else # Repayment
+            @inbounds x = parameters.z_grid[z_1_i,1]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,1]]+parameters.z_grid[z_2_i,2]*parameters.h_grid[age]*parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,2]]+parameters.a_grid[a_i]-q_C[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age],z_1_i,z_2_i,age]*parameters.a_grid[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]]-parameters.κ_grid[age,1,κ_1_i]-parameters.κ_grid[age,1,κ_2_i]
+
+            # With economies of scale
+            c = x/(2^(1/parameters.ρ_s))
+        end
+
+        # Compute leisure
+        l_1 = parameters.T - parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,1]]
+        l_2 = parameters.T - parameters.n_grid[n_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age,2]]
+
+        if age==parameters.lifespan
+            V_C_1[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_1)
+            V_C_2[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_2)
+        else
+            V_C_1[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_1) + parameters.β*(1-parameters.ψ)*V_expect_C_1_mat[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age],z_i] + parameters.β*parameters.ψ*(0.5*V_expect_div_mat_women[a_p_i_half_1, z_1_i]+0.5*V_expect_div_mat_women[a_p_i_half_2, z_1_i])
+
+            V_C_2[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age]=utility_function(c,l_2) + parameters.β*(1-parameters.ψ)*V_expect_C_2_mat[a_C_i[a_i,z_1_i,z_2_i,κ_1_i,κ_2_i,age],z_i] + parameters.β*parameters.ψ*(0.5*V_expect_div_mat_men[a_p_i_half_2, z_2_i]+0.5*V_expect_div_mat_men[a_p_i_half_1, z_2_i])
+        end
+    end
+end
+
+# V_C_sum = V_C_1 + V_C_2
+
+welfare_C_women = 0.0
+
+for z_1_i in 1:parameters.z_size, z_2_i in 1:parameters.z_size
+    global welfare_C_women += parameters.Γ_z_initial[z_1_i]*parameters.Γ_z_initial[z_2_i]*V_C_1[parameters.a_ind_zero,z_1_i,z_2_i,1,1,1]
+end
+
+welfare_C_men = 0.0
+
+for z_1_i in 1:parameters.z_size, z_2_i in 1:parameters.z_size
+    global welfare_C_men += parameters.Γ_z_initial[z_1_i]*parameters.Γ_z_initial[z_2_i]*V_C_2[parameters.a_ind_zero,z_1_i,z_2_i,1,1,1]
+end
