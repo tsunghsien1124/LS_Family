@@ -297,15 +297,25 @@ function threshold_function!(
     end
 
     # defaulting thresholds in earnings
+    # for κ_i in 1:κ_size, a_i in 1:a_size
+    #     a = a_grid[a_i]
+    #     @inbounds @views thres_a_no_Inf = findall(variables.thres_s_m_a[κ_i, :, h_i] .!= -Inf)
+    #     @inbounds @views thres_a_grid_itp = -variables.thres_s_m_a[κ_i, thres_a_no_Inf, h_i]
+    #     @inbounds @views e_m_grid_itp = e_m_grid[thres_a_no_Inf]
+    #     e_m_itp = linear_interpolation(thres_a_grid_itp, e_m_grid_itp, extrapolation_bc=Interpolations.Line())
+    #     @inbounds variables.thres_s_m_e[a_i, κ_i, h_i] = e_m_itp(-a)
+    # end
+    # variables.thres_s_m_e[:, :, h_i] .= log_function.(variables.thres_s_m_e[:, :, h_i])
+
+    e_m_grid_log = log.(e_m_grid)
     for κ_i in 1:κ_size, a_i in 1:a_size
         a = a_grid[a_i]
         @inbounds @views thres_a_no_Inf = findall(variables.thres_s_m_a[κ_i, :, h_i] .!= -Inf)
         @inbounds @views thres_a_grid_itp = -variables.thres_s_m_a[κ_i, thres_a_no_Inf, h_i]
-        @inbounds @views e_m_grid_itp = e_m_grid[thres_a_no_Inf]
+        @inbounds @views e_m_grid_itp = e_m_grid_log[thres_a_no_Inf]
         e_m_itp = linear_interpolation(thres_a_grid_itp, e_m_grid_itp, extrapolation_bc=Interpolations.Line())
         @inbounds variables.thres_s_m_e[a_i, κ_i, h_i] = e_m_itp(-a)
     end
-    variables.thres_s_m_e[:, :, h_i] .= log_function.(variables.thres_s_m_e[:, :, h_i])
 
     # return results
     return nothing
@@ -535,6 +545,6 @@ plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end] .* 
 plot!(variables.rbl_s_m[:, end, 1], variables.rbl_s_m[:, end, 2], seriestype=:scatter)
 # plot(parameters.a_grid, variables.q_s_m[:, :, end] .* parameters.a_grid)
 
-plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 2, end-5:end])
+plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 3, end])
 
-plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-2])
+# plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-2])
