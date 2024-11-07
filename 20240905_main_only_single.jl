@@ -28,7 +28,7 @@ function adda_cooper(N::Integer, ρ::Real, σ::Real; μ::Real=0.0)
     else
         for i = 1:N, j = 1:N
             f(u) = exp(-(u - μ)^2.0 / (2.0 * σ_ϵ^2.0)) * (cdf(Normal(), (ϵ[j+1] - μ * (1.0 - ρ) - ρ * u) / σ) - cdf(Normal(), (ϵ[j] - μ * (1.0 - ρ) - ρ * u) / σ))
-            integral, err = quadgk(u -> f(u), ϵ[i], ϵ[i+1])
+            integral = quadgk(u -> f(u), ϵ[i], ϵ[i+1])[1]
             Π[i, j] = (N / sqrt(2.0 * π * σ_ϵ^2.0)) * integral
         end
     end
@@ -49,7 +49,7 @@ function parameters_function(;
     e_m_ρ::Float64=0.9730,              # AR(1) of male persistent income
     e_m_σ::Float64=sqrt(0.016),         # s.d. of male persistent income 
     e_m_size::Int64=5,                  # number of male persistent income 
-    a_min::Float64=-100.0,              # min of asset holding
+    a_min::Float64=-20.0,               # min of asset holding
     a_max::Float64=800.0,               # max of asset holding
     a_size_neg::Int64=501,              # number of grid of negative asset holding for VFI
     a_size_pos::Int64=101,              # number of grid of positive asset holding for VFI
@@ -69,9 +69,9 @@ function parameters_function(;
     h_grid = [
         0.774482122, 0.819574547, 0.873895492, 0.9318168, 0.986069673,
         1.036889326, 1.082870993, 1.121249981, 1.148476948, 1.161069822,
-        1.156650443, 1.134940682, 1.09844343, 1.05261516, 1.005569967, 
+        1.156650443, 1.134940682, 1.09844343, 1.05261516, 1.005569967,
         0.9519
-        ]
+    ]
     h_size = length(h_grid)
 
     # male persistent income
@@ -94,6 +94,9 @@ function parameters_function(;
     # labor supply
     n_grid = collect(0.0:0.5:1.0)
     n_size = length(n_grid)
+
+    # normalization factor
+    χ = (1.0 - β^life_span) / (1.0 - β)
 
     # iterators
     loop_VFI = collect(Iterators.product(1:κ_size, 1:e_m_size, 1:a_size))
@@ -133,6 +136,7 @@ function parameters_function(;
         a_degree=a_degree,
         n_grid=n_grid,
         n_size=n_size,
+        χ=χ,
         loop_VFI=loop_VFI,
         loop_thres_a=loop_thres_a,
         loop_thres_e=loop_thres_e,
@@ -159,12 +163,12 @@ mutable struct Mutable_Variables
     rbl_s_m::Array{Float64,3} # (e, h ≈ j, 2)
 end
 
-function utility_function(c::Float64, l::Float64, γ::Float64, ω::Float64)
+function utility_function(c::Float64, l::Float64, γ::Float64, ω::Float64, χ::Float64)
     """
     compute utility of CRRA utility function with coefficient γ
     """
     if (c > 0.0) && (l > 0.0)
-        return γ == 1.0 ? log(c^ω * l^(1.0 - ω)) : 1.0 / ((1.0 - γ) * (c^ω * l^(1.0 - ω))^(γ - 1.0))
+        return γ == 1.0 ? log(c^ω * l^(1.0 - ω)) / χ : 1.0 / (χ * (1.0 - γ) * (c^ω * l^(1.0 - ω))^(γ - 1.0))
     else
         return -Inf
     end
@@ -177,7 +181,7 @@ function variables_function(parameters::NamedTuple)
 
     # unpack parameters
     @unpack a_size, a_grid, e_m_size, e_m_grid, κ_size, κ_grid, h_size, h_grid, n_size, n_grid = parameters
-    @unpack r_f, ϕ, γ, ω, T = parameters
+    @unpack r_f, ϕ, γ, ω, T, χ = parameters
 
     # define value and policy functions
     V_s_m = zeros(a_size, κ_size, e_m_size, h_size)
@@ -189,7 +193,7 @@ function variables_function(parameters::NamedTuple)
     policy_s_m_d = zeros(a_size, κ_size, e_m_size, h_size)
     policy_s_m_d_n = zeros(e_m_size, h_size)
 
-    # solve the last period value
+    # solve the last period
     h = h_grid[h_size]
     for e_m_i in 1:e_m_size
         e_m = e_m_grid[e_m_i]
@@ -198,14 +202,14 @@ function variables_function(parameters::NamedTuple)
         n = 0.0
         l = T - n
         c = h * e_m * n * (1.0 - ϕ)
-        u = utility_function(c, l, γ, ω)
+        u = utility_function(c, l, γ, ω, χ)
         V_s_m_d[e_m_i, h_size] = u
         policy_s_m_d_n[e_m_i, h_size] = n
         for n_i in 2:n_size
             n = n_grid[n_i]
             l = T - n
             c = h * e_m * n * (1.0 - ϕ)
-            u = utility_function(c, l, γ, ω)
+            u = utility_function(c, l, γ, ω, χ)
             if u > V_s_m_d[e_m_i, h_size]
                 V_s_m_d[e_m_i, h_size] = u
                 policy_s_m_d_n[e_m_i, h_size] = n
@@ -219,14 +223,14 @@ function variables_function(parameters::NamedTuple)
             n = 0.0
             l = T - n
             c = h * e_m * n + a - κ
-            u = utility_function(c, l, γ, ω)
+            u = utility_function(c, l, γ, ω, χ)
             V_s_m_r[a_i, κ_i, e_m_i, h_size] = u
             policy_s_m_r_n[a_i, κ_i, e_m_i, h_size] = n
             for n_i in 2:n_size
                 n = n_grid[n_i]
                 l = T - n
                 c = h * e_m * n + a - κ
-                u = utility_function(c, l, γ, ω)
+                u = utility_function(c, l, γ, ω, χ)
                 if u > V_s_m_r[a_i, κ_i, e_m_i, h_size]
                     V_s_m_r[a_i, κ_i, e_m_i, h_size] = u
                     policy_s_m_r_n[a_i, κ_i, e_m_i, h_size] = n
@@ -316,7 +320,7 @@ function pricing_and_rbl_function!(
     """
 
     # unpack parameters
-    @unpack e_m_size, e_m_ρ, e_m_σ, e_m_grid, a_grid, a_size_neg, a_grid_neg, a_ind_zero, h_grid, κ_size, κ_Γ, r_f, τ, ψ = parameters
+    @unpack e_m_size, e_m_ρ, e_m_σ, e_m_grid, a_grid, a_size_neg, a_grid_neg, a_ind_zero, h_grid, κ_size, κ_Γ, r_f, τ, ϕ = parameters
 
     # loop over states
     for e_m_i in 1:e_m_size
@@ -332,7 +336,7 @@ function pricing_and_rbl_function!(
                 if repayment_prob ≈ 1.0
                     @inbounds variables.R_s_m[a_p_i, e_m_i, h_i] += κ_Γ[κ_p_i] * (-a_p)
                 else
-                    @inbounds @views garnishment_itp = linear_interpolation(e_m_grid, ψ * h_grid[h_i+1] .* e_m_grid .* variables.policy_s_m_d_n[:, h_i+1], extrapolation_bc=Interpolations.Line())
+                    @inbounds @views garnishment_itp = linear_interpolation(e_m_grid, ϕ * h_grid[h_i+1] .* e_m_grid .* variables.policy_s_m_d_n[:, h_i+1], extrapolation_bc=Interpolations.Line())
                     expected_garnishment(x) = garnishment_itp(exp(x)) * pdf(Normal(e_m_μ, e_m_σ), x)
                     @inbounds variables.R_s_m[a_p_i, e_m_i, h_i] += κ_Γ[κ_p_i] * quadgk(x -> expected_garnishment(x), -Inf, e_m_p_thres)[1]
                     @inbounds variables.R_s_m[a_p_i, e_m_i, h_i] += κ_Γ[κ_p_i] * repayment_prob * (-a_p)
@@ -401,7 +405,7 @@ function value_and_policy_function!(
     """
 
     # unpack parameters
-    @unpack h_grid, a_size, a_grid, e_m_size, e_m_grid, κ_size, κ_grid, n_size, n_grid, T, γ, ω, ϕ = parameters
+    @unpack h_grid, a_size, a_grid, e_m_size, e_m_grid, κ_size, κ_grid, n_size, n_grid, T, γ, ω, ϕ, χ = parameters
 
     # loop over all states
     h = h_grid[h_i]
@@ -418,20 +422,20 @@ function value_and_policy_function!(
         EV_itp = Akima(a_grid, EV)
 
         # construct objective functions
-        obj_r(a_p, CoH, l) = -(utility_function(CoH - qa_itp(a_p), l, γ, ω) + EV_itp(a_p))
+        obj_r(a_p, CoH, l) = -(utility_function(CoH - qa_itp(a_p), l, γ, ω, χ) + EV_itp(a_p))
 
         # default
         n = 0.0
         l = T - n
         c = h * e_m * n * (1.0 - ϕ)
-        u = utility_function(c, l, γ, ω) + EV_itp(0.0)
+        u = utility_function(c, l, γ, ω, χ) + EV_itp(0.0)
         variables.V_s_m_d[e_m_i, h_i] = u
         variables.policy_s_m_d_n[e_m_i, h_i] = n
         for n_i in 2:n_size
             n = n_grid[n_i]
             l = T - n
             c = h * e_m * n * (1.0 - ϕ)
-            u = utility_function(c, l, γ, ω) + EV_itp(0.0)
+            u = utility_function(c, l, γ, ω, χ) + EV_itp(0.0)
             if u > variables.V_s_m_d[e_m_i, h_i]
                 variables.V_s_m_d[e_m_i, h_i] = u
                 variables.policy_s_m_d_n[e_m_i, h_i] = n
@@ -519,6 +523,11 @@ pricing_and_rbl_function!(parameters.h_size - 5, variables, parameters)
 E_V_function!(parameters.h_size - 5, variables, parameters)
 value_and_policy_function!(parameters.h_size - 5, variables, parameters)
 
+threshold_function!(parameters.h_size - 5, variables, parameters)
+pricing_and_rbl_function!(parameters.h_size - 6, variables, parameters)
+E_V_function!(parameters.h_size - 6, variables, parameters)
+value_and_policy_function!(parameters.h_size - 6, variables, parameters)
+
 # cheching figures
 using Plots
 plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end])
@@ -526,4 +535,6 @@ plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end] .* 
 plot!(variables.rbl_s_m[:, end, 1], variables.rbl_s_m[:, end, 2], seriestype=:scatter)
 # plot(parameters.a_grid, variables.q_s_m[:, :, end] .* parameters.a_grid)
 
-plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 3, end-4:end])
+plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 2, end-5:end])
+
+plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-2])
