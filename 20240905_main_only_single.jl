@@ -49,7 +49,7 @@ function parameters_function(;
     e_m_ρ::Float64=0.9730,              # AR(1) of male persistent income
     e_m_σ::Float64=sqrt(0.016),         # s.d. of male persistent income 
     e_m_size::Int64=5,                  # number of male persistent income 
-    a_min::Float64=-20.0,               # min of asset holding
+    a_min::Float64=-2.5,                # min of asset holding
     a_max::Float64=800.0,               # max of asset holding
     a_size_neg::Int64=501,              # number of grid of negative asset holding for VFI
     a_size_pos::Int64=101,              # number of grid of positive asset holding for VFI
@@ -346,9 +346,9 @@ function pricing_and_rbl_function!(
                 if repayment_prob ≈ 1.0
                     @inbounds variables.R_s_m[a_p_i, e_m_i, h_i] += κ_Γ[κ_p_i] * (-a_p)
                 else
-                    @inbounds @views garnishment_itp = linear_interpolation(e_m_grid, ϕ * h_grid[h_i+1] .* e_m_grid .* variables.policy_s_m_d_n[:, h_i+1], extrapolation_bc=Interpolations.Line())
-                    expected_garnishment(x) = garnishment_itp(exp(x)) * pdf(Normal(e_m_μ, e_m_σ), x)
-                    @inbounds variables.R_s_m[a_p_i, e_m_i, h_i] += κ_Γ[κ_p_i] * quadgk(x -> expected_garnishment(x), -Inf, e_m_p_thres)[1]
+                    # @inbounds @views garnishment_itp = linear_interpolation(e_m_grid, ϕ * h_grid[h_i+1] .* e_m_grid .* variables.policy_s_m_d_n[:, h_i+1], extrapolation_bc=Interpolations.Line())
+                    # expected_garnishment(x) = garnishment_itp(exp(x)) * pdf(Normal(e_m_μ, e_m_σ), x)
+                    # @inbounds variables.R_s_m[a_p_i, e_m_i, h_i] += κ_Γ[κ_p_i] * quadgk(x -> expected_garnishment(x), -Inf, e_m_p_thres)[1]
                     @inbounds variables.R_s_m[a_p_i, e_m_i, h_i] += κ_Γ[κ_p_i] * repayment_prob * (-a_p)
                 end
             end
@@ -528,15 +528,15 @@ pricing_and_rbl_function!(parameters.h_size - 4, variables, parameters)
 E_V_function!(parameters.h_size - 4, variables, parameters)
 value_and_policy_function!(parameters.h_size - 4, variables, parameters)
 
-threshold_function!(parameters.h_size - 4, variables, parameters)
-pricing_and_rbl_function!(parameters.h_size - 5, variables, parameters)
-E_V_function!(parameters.h_size - 5, variables, parameters)
-value_and_policy_function!(parameters.h_size - 5, variables, parameters)
+# threshold_function!(parameters.h_size - 4, variables, parameters)
+# pricing_and_rbl_function!(parameters.h_size - 5, variables, parameters)
+# E_V_function!(parameters.h_size - 5, variables, parameters)
+# value_and_policy_function!(parameters.h_size - 5, variables, parameters)
 
-threshold_function!(parameters.h_size - 5, variables, parameters)
-pricing_and_rbl_function!(parameters.h_size - 6, variables, parameters)
-E_V_function!(parameters.h_size - 6, variables, parameters)
-value_and_policy_function!(parameters.h_size - 6, variables, parameters)
+# threshold_function!(parameters.h_size - 5, variables, parameters)
+# pricing_and_rbl_function!(parameters.h_size - 6, variables, parameters)
+# E_V_function!(parameters.h_size - 6, variables, parameters)
+# value_and_policy_function!(parameters.h_size - 6, variables, parameters)
 
 # cheching figures
 using Plots
@@ -545,6 +545,6 @@ plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end] .* 
 plot!(variables.rbl_s_m[:, end, 1], variables.rbl_s_m[:, end, 2], seriestype=:scatter)
 # plot(parameters.a_grid, variables.q_s_m[:, :, end] .* parameters.a_grid)
 
-plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 3, end])
+plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 1, end-2:end], legend=:topleft)
 
-# plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-2])
+plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-3])
