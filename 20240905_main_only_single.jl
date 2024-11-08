@@ -49,7 +49,7 @@ function parameters_function(;
     e_m_ρ::Float64=0.9730,              # AR(1) of male persistent income
     e_m_σ::Float64=sqrt(0.016),         # s.d. of male persistent income 
     e_m_size::Int64=5,                  # number of male persistent income 
-    a_min::Float64=-2.5,                # min of asset holding
+    a_min::Float64=-5.0,                # min of asset holding
     a_max::Float64=800.0,               # max of asset holding
     a_size_neg::Int64=501,              # number of grid of negative asset holding for VFI
     a_size_pos::Int64=101,              # number of grid of positive asset holding for VFI
@@ -262,6 +262,8 @@ end
 
 log_function(threshold_e::Float64) = threshold_e > 0.0 ? log(threshold_e) : -Inf
 
+reverse_utility_function(u::Float64, γ::Float64) = ((1.0 - γ) * u)^(1.0 / (1.0 - γ))
+
 function threshold_function!(
     h_i::Int64,
     variables::Mutable_Variables,
@@ -271,7 +273,7 @@ function threshold_function!(
     update default thresholds
     """
     # unpack parameters
-    @unpack a_size, a_grid, e_m_size, e_m_grid, κ_size, κ_grid = parameters
+    @unpack a_size, a_grid, e_m_size, e_m_grid, κ_size, κ_grid, h_grid, γ = parameters
 
     # defaulting thresholds in wealth
     for e_m_i in 1:e_m_size, κ_i in 1:κ_size
@@ -284,19 +286,25 @@ function threshold_function!(
             error("V_d < V_nd for all a")
             variables.thres_s_m_a[κ_i, e_m_i, h_i] = -Inf
         else
-            @inbounds @views V_r_h_no_Inf = findall(V_r_h .!= -Inf)
-            @inbounds @views a_grid_itp = a_grid[V_r_h_no_Inf]
-            @inbounds @views V_r_h_grid_itp = V_r_h[V_r_h_no_Inf]
-            V_r_h_itp = linear_interpolation(a_grid_itp, V_r_h_grid_itp, extrapolation_bc=Interpolations.Line())
-            @inbounds V_h_diff_itp(a) = V_r_h_itp(a) - V_d_h
             a_ind = findfirst(V_r_h .> V_d_h)
             @inbounds V_h_diff_lb = a_grid[a_ind-1]
             @inbounds V_h_diff_ub = a_grid[a_ind]
-            @inbounds variables.thres_s_m_a[κ_i, e_m_i, h_i] = find_zero(a -> V_h_diff_itp(a), (V_h_diff_lb, V_h_diff_ub), Bisection())
+            @inbounds @views V_r_h_no_Inf = findall(V_r_h .!= -Inf)
+            @inbounds @views a_grid_itp = a_grid[V_r_h_no_Inf]
+            @inbounds @views V_r_h_grid_itp = V_r_h[V_r_h_no_Inf]
+            # V_r_h_itp = linear_interpolation(a_grid_itp, V_r_h_grid_itp, extrapolation_bc=Interpolations.Line())
+            # @inbounds V_h_diff_itp(a) = V_r_h_itp(a) - V_d_h
+            # @inbounds variables.thres_s_m_a[κ_i, e_m_i, h_i] = find_zero(a -> V_h_diff_itp(a), (V_h_diff_lb, V_h_diff_ub), Bisection())
+            V_r_h_grid_itp_γ = reverse_utility_function.(V_r_h_grid_itp, Ref(γ))
+            V_d_h_γ = reverse_utility_function(V_d_h, γ)
+            V_r_h_itp_γ = linear_interpolation(a_grid_itp, V_r_h_grid_itp_γ, extrapolation_bc=Interpolations.Line())
+            @inbounds V_h_diff_itp_γ(a) = V_r_h_itp_γ(a) - V_d_h_γ
+            @inbounds variables.thres_s_m_a[κ_i, e_m_i, h_i] = find_zero(a -> V_h_diff_itp_γ(a), (V_h_diff_lb, V_h_diff_ub), Bisection())
         end
     end
 
     # defaulting thresholds in earnings
+    # method one
     # for κ_i in 1:κ_size, a_i in 1:a_size
     #     a = a_grid[a_i]
     #     @inbounds @views thres_a_no_Inf = findall(variables.thres_s_m_a[κ_i, :, h_i] .!= -Inf)
@@ -307,15 +315,54 @@ function threshold_function!(
     # end
     # variables.thres_s_m_e[:, :, h_i] .= log_function.(variables.thres_s_m_e[:, :, h_i])
 
-    e_m_grid_log = log.(e_m_grid)
+    # method one (1) (taking into account h)
     for κ_i in 1:κ_size, a_i in 1:a_size
         a = a_grid[a_i]
         @inbounds @views thres_a_no_Inf = findall(variables.thres_s_m_a[κ_i, :, h_i] .!= -Inf)
         @inbounds @views thres_a_grid_itp = -variables.thres_s_m_a[κ_i, thres_a_no_Inf, h_i]
-        @inbounds @views e_m_grid_itp = e_m_grid_log[thres_a_no_Inf]
+        @inbounds @views e_m_grid_itp = h_grid[h_i] .* e_m_grid[thres_a_no_Inf]
         e_m_itp = linear_interpolation(thres_a_grid_itp, e_m_grid_itp, extrapolation_bc=Interpolations.Line())
         @inbounds variables.thres_s_m_e[a_i, κ_i, h_i] = e_m_itp(-a)
     end
+    variables.thres_s_m_e[:, :, h_i] .= log_function.(variables.thres_s_m_e[:, :, h_i])
+
+    # method one (1) (taking into account h and using Akima)
+    # for κ_i in 1:κ_size, a_i in 1:a_size
+    #     a = a_grid[a_i]
+    #     @inbounds @views thres_a_no_Inf = findall(variables.thres_s_m_a[κ_i, :, h_i] .!= -Inf)
+    #     @inbounds @views thres_a_grid_itp = variables.thres_s_m_a[κ_i, thres_a_no_Inf, h_i]
+    #     @inbounds @views e_m_grid_itp = h_grid[h_i] .* e_m_grid[thres_a_no_Inf]
+    #     e_m_itp = Akima(thres_a_grid_itp, e_m_grid_itp)
+    #     @inbounds variables.thres_s_m_e[a_i, κ_i, h_i] = e_m_itp(a)
+    # end
+    # variables.thres_s_m_e[:, :, h_i] .= log_function.(variables.thres_s_m_e[:, :, h_i])
+
+    # method two (1) (losing too much curvature)
+    # e_m_grid_log = log.(e_m_grid)
+    # for κ_i in 1:κ_size, a_i in 1:a_size
+    #     a = a_grid[a_i]
+    #     @inbounds @views thres_a_no_Inf = findall(variables.thres_s_m_a[κ_i, :, h_i] .!= -Inf)
+    #     @inbounds @views thres_a_grid_itp = -variables.thres_s_m_a[κ_i, thres_a_no_Inf, h_i]
+    #     @inbounds @views e_m_grid_itp = e_m_grid_log[thres_a_no_Inf]
+    #     e_m_itp = linear_interpolation(thres_a_grid_itp, e_m_grid_itp, extrapolation_bc=Interpolations.Line())
+    #     @inbounds variables.thres_s_m_e[a_i, κ_i, h_i] = e_m_itp(-a)
+    # end
+
+    # method two (2) (losing not so much curvature by using Akima) NOT WORKING!
+    # e_m_grid_log = log.(e_m_grid)
+    # for κ_i in 1:κ_size, a_i in 1:a_size
+    #     a = a_grid[a_i]
+    #     @inbounds @views thres_a_no_Inf = findall(variables.thres_s_m_a[κ_i, :, h_i] .!= -Inf)
+    #     @inbounds @views thres_a_grid_itp = variables.thres_s_m_a[κ_i, thres_a_no_Inf, h_i]
+    #     @inbounds @views e_m_grid_itp = e_m_grid_log[thres_a_no_Inf]
+    #     e_m_itp = Akima(thres_a_grid_itp, e_m_grid_itp)
+    #     @inbounds variables.thres_s_m_e[a_i, κ_i, h_i] = e_m_itp(a)
+    # end
+
+    # checking plot
+    # plot(thres_a_grid_itp, e_m_grid_itp)
+    # plot(parameters.a_grid_neg, e_m_itp.(parameters.a_grid_neg))
+    # plot!(thres_a_grid_itp, e_m_grid_itp, seriestype=:scatter)
 
     # return results
     return nothing
@@ -523,10 +570,10 @@ pricing_and_rbl_function!(parameters.h_size - 3, variables, parameters)
 E_V_function!(parameters.h_size - 3, variables, parameters)
 value_and_policy_function!(parameters.h_size - 3, variables, parameters)
 
-threshold_function!(parameters.h_size - 3, variables, parameters)
-pricing_and_rbl_function!(parameters.h_size - 4, variables, parameters)
-E_V_function!(parameters.h_size - 4, variables, parameters)
-value_and_policy_function!(parameters.h_size - 4, variables, parameters)
+# threshold_function!(parameters.h_size - 3, variables, parameters)
+# pricing_and_rbl_function!(parameters.h_size - 4, variables, parameters)
+# E_V_function!(parameters.h_size - 4, variables, parameters)
+# value_and_policy_function!(parameters.h_size - 4, variables, parameters)
 
 # threshold_function!(parameters.h_size - 4, variables, parameters)
 # pricing_and_rbl_function!(parameters.h_size - 5, variables, parameters)
@@ -545,6 +592,6 @@ plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end] .* 
 plot!(variables.rbl_s_m[:, end, 1], variables.rbl_s_m[:, end, 2], seriestype=:scatter)
 # plot(parameters.a_grid, variables.q_s_m[:, :, end] .* parameters.a_grid)
 
-plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 1, end-2:end], legend=:topleft)
+plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, 5, end-2:end], legend=:topleft)
 
-plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-3])
+# plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-3])
