@@ -656,10 +656,12 @@ function value_and_policy_function!(
             n = n_grid[n_i]
             l = T - n
             c = he_m * n * (1.0f0 - ϕ)
-            u = utility_function(c, l, γ, ω) + EV_m[a_ind_zero]
-            if u > variables.V_s_m_d[e_i, h_i]
-                variables.V_s_m_d[e_i, h_i] = u
-                variables.policy_s_m_d_n[e_i, h_i] = n
+            if c > 0.0f0
+                u = utility_function(c, l, γ, ω) + EV_m[a_ind_zero]
+                if u > variables.V_s_m_d[e_i, h_i]
+                    variables.V_s_m_d[e_i, h_i] = u
+                    variables.policy_s_m_d_n[e_i, h_i] = n
+                end
             end
         end
 
@@ -678,20 +680,24 @@ function value_and_policy_function!(
 
                     # single
                     c = income - qa_m[a_p_i]
-                    u = utility_function(c, l, γ, ω) + EV_m[a_p_i]
-                    if u > variables.V_s_m_r[a_i, κ_i, e_i, h_i]
-                        variables.V_s_m_r[a_i, κ_i, e_i, h_i] = u
-                        variables.policy_s_m_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
-                        variables.policy_s_m_r_n[a_i, κ_i, e_i, h_i] = n
+                    if c > 0.0f0
+                        u = utility_function(c, l, γ, ω) + EV_m[a_p_i]
+                        if u > variables.V_s_m_r[a_i, κ_i, e_i, h_i]
+                            variables.V_s_m_r[a_i, κ_i, e_i, h_i] = u
+                            variables.policy_s_m_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
+                            variables.policy_s_m_r_n[a_i, κ_i, e_i, h_i] = n
+                        end
                     end
 
                     # divorced
                     c = c - κ_div
-                    u = utility_function(c, l, γ, ω) + EV_m[a_p_i]
-                    if u > variables.V_d_m_r[a_i, κ_i, e_i, h_i]
-                        variables.V_d_m_r[a_i, κ_i, e_i, h_i] = u
-                        variables.policy_d_m_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
-                        variables.policy_d_m_r_n[a_i, κ_i, e_i, h_i] = n
+                    if c > 0.0f0
+                        u = utility_function(c, l, γ, ω) + EV_m[a_p_i]
+                        if u > variables.V_d_m_r[a_i, κ_i, e_i, h_i]
+                            variables.V_d_m_r[a_i, κ_i, e_i, h_i] = u
+                            variables.policy_d_m_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
+                            variables.policy_d_m_r_n[a_i, κ_i, e_i, h_i] = n
+                        end
                     end
                 end
             end
@@ -728,10 +734,12 @@ function value_and_policy_function!(
             n = n_grid[n_i]
             l = T - n
             c = he_f * n * (1.0f0 - ϕ)
-            u = utility_function(c, l, γ, ω) + EV_f[a_ind_zero]
-            if u > variables.V_s_f_d[e_i, h_i]
-                variables.V_s_f_d[e_i, h_i] = u
-                variables.policy_s_f_d_n[e_i, h_i] = n
+            if c > 0.0f0
+                u = utility_function(c, l, γ, ω) + EV_f[a_ind_zero]
+                if u > variables.V_s_f_d[e_i, h_i]
+                    variables.V_s_f_d[e_i, h_i] = u
+                    variables.policy_s_f_d_n[e_i, h_i] = n
+                end
             end
         end
 
@@ -750,20 +758,24 @@ function value_and_policy_function!(
 
                     # single
                     c = income - qa_f[a_p_i]
-                    u = utility_function(c, l, γ, ω) + EV_f[a_p_i]
-                    if u > variables.V_s_f_r[a_i, κ_i, e_i, h_i]
-                        variables.V_s_f_r[a_i, κ_i, e_i, h_i] = u
-                        variables.policy_s_f_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
-                        variables.policy_s_f_r_n[a_i, κ_i, e_i, h_i] = n
+                    if c > 0.0f0
+                        u = utility_function(c, l, γ, ω) + EV_f[a_p_i]
+                        if u > variables.V_s_f_r[a_i, κ_i, e_i, h_i]
+                            variables.V_s_f_r[a_i, κ_i, e_i, h_i] = u
+                            variables.policy_s_f_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
+                            variables.policy_s_f_r_n[a_i, κ_i, e_i, h_i] = n
+                        end
                     end
 
                     # divorced
                     c = c - κ_div
-                    u = utility_function(c, l, γ, ω) + EV_f[a_p_i]
-                    if u > variables.V_d_f_r[a_i, κ_i, e_i, h_i]
-                        variables.V_d_f_r[a_i, κ_i, e_i, h_i] = u
-                        variables.policy_d_f_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
-                        variables.policy_d_f_r_n[a_i, κ_i, e_i, h_i] = n
+                    if c > 0.0f0
+                        u = utility_function(c, l, γ, ω) + EV_f[a_p_i]
+                        if u > variables.V_d_f_r[a_i, κ_i, e_i, h_i]
+                            variables.V_d_f_r[a_i, κ_i, e_i, h_i] = u
+                            variables.policy_d_f_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
+                            variables.policy_d_f_r_n[a_i, κ_i, e_i, h_i] = n
+                        end
                     end
                 end
             end
@@ -805,11 +817,13 @@ function value_and_policy_function!(
             l_m = T - n_m
             l_f = T - n_f
             c = (he_m * n_m + he_f * n_f) * (1.0f0 - ϕ)
-            u = utility_function(c / η, l_m, l_f, γ, ω) + EV_c[a_ind_zero]
-            if u > variables.V_c_d[e_f_i, e_m_i, h_i]
-                variables.V_c_d[e_f_i, e_m_i, h_i] = u
-                variables.policy_c_d_n_m[e_f_i, e_m_i, h_i] = n_m
-                variables.policy_c_d_n_f[e_f_i, e_m_i, h_i] = n_f
+            if c > 0.0f0
+                u = utility_function(c / η, l_m, l_f, γ, ω) + EV_c[a_ind_zero]
+                if u > variables.V_c_d[e_f_i, e_m_i, h_i]
+                    variables.V_c_d[e_f_i, e_m_i, h_i] = u
+                    variables.policy_c_d_n_m[e_f_i, e_m_i, h_i] = n_m
+                    variables.policy_c_d_n_f[e_f_i, e_m_i, h_i] = n_f
+                end
             end
         end
 
@@ -829,12 +843,14 @@ function value_and_policy_function!(
                 income = he_m * n_m + he_f * n_f + a_κ
                 for a_p_i in 1i0:a_size
                     c = income - qa_c[a_p_i]
-                    u = utility_function(c / η, l_m, l_f, γ, ω) + EV_c[a_p_i]
-                    if u > variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
-                        variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = u
-                        variables.policy_c_r_a[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = a_grid_c[a_p_i]
-                        variables.policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_m
-                        variables.policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_f
+                    if c > 0.0f0
+                        u = utility_function(c / η, l_m, l_f, γ, ω) + EV_c[a_p_i]
+                        if u > variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
+                            variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = u
+                            variables.policy_c_r_a[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = a_grid_c[a_p_i]
+                            variables.policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_m
+                            variables.policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_f
+                        end
                     end
                 end
             end
