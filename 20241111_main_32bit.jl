@@ -76,7 +76,8 @@ function parameters_function(;
     e_m_ρ = e_m_ρ^period
     e_f_σ = sqrt((e_f_ρ^4.0f0 + e_f_ρ^2.0f0 + 1.0f0) * e_f_σ^2.0f0)
     e_f_ρ = e_f_ρ^period
-
+    R_f = 1.0f0 + r_f
+    BR = 1.0f0 + r_f + τ
 
     # lifecycle profile (Gourinchas and Parker, 2002)
     h_grid = [
@@ -121,10 +122,7 @@ function parameters_function(;
     # labor supply
     n_grid = collect(0.0f0:0.5f0:1.0f0)
     n_size = Int32(length(n_grid))
-    n_grid_c =
 
-    # normalization factor
-    χ = (1.0f0 - β^life_span) / (1.0f0 - β)
 
     # iterators
     loop_q_s = collect(Iterators.product(1i0:e_size, 1i0:(a_size_neg-1i0)))
@@ -141,6 +139,8 @@ function parameters_function(;
         β=β,
         r_f=r_f,
         τ=τ,
+        R_f=R_f,
+        BR=BR,
         γ=γ,
         ω=ω,
         T=T,
@@ -178,7 +178,6 @@ function parameters_function(;
         a_degree=a_degree,
         n_grid=n_grid,
         n_size=n_size,
-        χ=χ,
         loop_q_s=loop_q_s,
         loop_EV_s=loop_EV_s,
         loop_V_s=loop_V_s,
@@ -238,12 +237,23 @@ mutable struct Mutable_Variables
     q_c::Array{Float32,4} # (a', e_f, e_m, h)
 end
 
-function utility_function(c::Float32, l::Float32, γ::Float32, ω::Float32, χ::Float32)
+function utility_function(c::Float32, l::Float32, γ::Float32, ω::Float32)
     """
     compute utility of CRRA utility function with coefficient γ
     """
     if (c > 0.0f0) && (l > 0.0f0)
-        return γ == 1.0f0 ? log(c^ω * l^(1.0f0 - ω)) / χ : 1.0f0 / (χ * (1.0f0 - γ) * (c^ω * l^(1.0f0 - ω))^(γ - 1.0f0))
+        return γ == 1.0f0 ? log(c^ω * l^(1.0f0 - ω)) : 1.0f0 / ((1.0f0 - γ) * (c^ω * l^(1.0f0 - ω))^(γ - 1.0f0))
+    else
+        return -Inf32
+    end
+end
+
+function utility_function(c::Float32, l_m::Float32, l_f::Float32, γ::Float32, ω::Float32)
+    """
+    compute utility of CRRA utility function with coefficient γ
+    """
+    if (c > 0.0f0) && (l_m > 0.0f0) && (l_f > 0.0f0)
+        return γ == 1.0f0 ? log(c^ω * l_m^(1.0f0 - ω)) + log(c^ω * l_f^(1.0f0 - ω)) : 1.0f0 / ((1.0f0 - γ) * (c^ω * l_m^(1.0f0 - ω))^(γ - 1.0f0)) + 1.0f0 / ((1.0f0 - γ) * (c^ω * l_f^(1.0f0 - ω))^(γ - 1.0f0))
     else
         return -Inf32
     end
@@ -256,7 +266,7 @@ function variables_function(parameters::NamedTuple)
 
     # unpack parameters
     @unpack loop_V_s, loop_V_c, a_size, a_grid, a_grid_c, e_size, e_m_grid, e_f_grid, κ_size, κ_grid, κ_grid_c, h_size, h_grid, n_size, n_grid = parameters
-    @unpack r_f, ϕ, γ, ω, T, χ, κ_div, η = parameters
+    @unpack R_f, ϕ, γ, ω, T, κ_div, η = parameters
 
     # define value and policy functions for male
     V_s_m = (-Inf32) .* ones(Float32, a_size, κ_size, e_size, h_size)
@@ -306,13 +316,14 @@ function variables_function(parameters::NamedTuple)
     # male
     for e_i in 1i0:e_size
         e_m = e_m_grid[e_i]
+        he_m = h * e_m
 
         # default (single)
         for n_i in 1i0:n_size
             n = n_grid[n_i]
             l = T - n
-            c = h * e_m * n * (1.0f0 - ϕ)
-            u = utility_function.(c, l, γ, ω, χ)
+            c = he_m * n * (1.0f0 - ϕ)
+            u = utility_function.(c, l, γ, ω)
             if u > V_s_m_d[e_i, h_size]
                 V_s_m_d[e_i, h_size] = u
                 policy_s_m_d_n[e_i, h_size] = n
@@ -323,14 +334,15 @@ function variables_function(parameters::NamedTuple)
         @batch for (κ_i, a_i) in loop_V_s
             a = a_grid[a_i]
             κ = κ_grid[κ_i, h_size]
+            a_κ = a - κ
 
             for n_i in 1i0:n_size
                 n = n_grid[n_i]
                 l = T - n
 
                 # single
-                c = h * e_m * n + a - κ
-                u = utility_function(c, l, γ, ω, χ)
+                c = he_m * n + a_κ
+                u = utility_function(c, l, γ, ω)
                 if u > V_s_m_r[a_i, κ_i, e_i, h_size]
                     V_s_m_r[a_i, κ_i, e_i, h_size] = u
                     policy_s_m_r_n[a_i, κ_i, e_i, h_size] = n
@@ -338,7 +350,7 @@ function variables_function(parameters::NamedTuple)
 
                 # divorced
                 c = c - κ_div
-                u = utility_function(c, l, γ, ω, χ)
+                u = utility_function(c, l, γ, ω)
                 if u > V_d_m_r[a_i, κ_i, e_i, h_size]
                     V_d_m_r[a_i, κ_i, e_i, h_size] = u
                     policy_d_m_r_n[a_i, κ_i, e_i, h_size] = n
@@ -366,13 +378,14 @@ function variables_function(parameters::NamedTuple)
     # female
     for e_i in 1i0:e_size
         e_f = e_f_grid[e_i]
+        he_f = h * e_f
 
         # default (single)
         for n_i in 1i0:n_size
             n = n_grid[n_i]
             l = T - n
-            c = h * e_f * n * (1.0f0 - ϕ)
-            u = utility_function.(c, l, γ, ω, χ)
+            c = he_f * n * (1.0f0 - ϕ)
+            u = utility_function.(c, l, γ, ω)
             if u > V_s_f_d[e_i, h_size]
                 V_s_f_d[e_i, h_size] = u
                 policy_s_f_d_n[e_i, h_size] = n
@@ -383,14 +396,15 @@ function variables_function(parameters::NamedTuple)
         @batch for (κ_i, a_i) in loop_V_s
             a = a_grid[a_i]
             κ = κ_grid[κ_i, h_size]
+            a_κ = a - κ
 
             for n_i in 1i0:n_size
                 n = n_grid[n_i]
                 l = T - n
 
                 # single
-                c = h * e_f * n + a - κ
-                u = utility_function(c, l, γ, ω, χ)
+                c = he_f * n + a_κ
+                u = utility_function(c, l, γ, ω)
                 if u > V_s_f_r[a_i, κ_i, e_i, h_size]
                     V_s_f_r[a_i, κ_i, e_i, h_size] = u
                     policy_s_f_r_n[a_i, κ_i, e_i, h_size] = n
@@ -398,7 +412,7 @@ function variables_function(parameters::NamedTuple)
 
                 # divorced
                 c = c - κ_div
-                u = utility_function(c, l, γ, ω, χ)
+                u = utility_function(c, l, γ, ω)
                 if u > V_d_f_r[a_i, κ_i, e_i, h_size]
                     V_d_f_r[a_i, κ_i, e_i, h_size] = u
                     policy_d_f_r_n[a_i, κ_i, e_i, h_size] = n
@@ -426,7 +440,9 @@ function variables_function(parameters::NamedTuple)
     # couple
     for e_m_i in 1i0:e_size, e_f_i in 1i0:e_size
         e_m = e_m_grid[e_m_i]
+        he_m = h * e_m
         e_f = e_f_grid[e_f_i]
+        he_f = h * e_f
 
         # default
         for n_m_i in 1i0:n_size, n_f_i in 1i0:n_size
@@ -434,8 +450,8 @@ function variables_function(parameters::NamedTuple)
             n_f = n_grid[n_f_i]
             l_m = T - n_m
             l_f = T - n_f
-            c = (h * e_m * n_m + h * e_f * n_f) * (1.0f0 - ϕ)
-            u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ)
+            c = (he_m * n_m + he_f * n_f) * (1.0f0 - ϕ)
+            u = utility_function(c / η, l_m, γ, ω) + utility_function(c / η, l_f, γ, ω)
             if u > V_c_d[e_f_i, e_m_i, h_size]
                 V_c_d[e_f_i, e_m_i, h_size] = u
                 policy_c_d_n_m[e_f_i, e_m_i, h_size] = n_m
@@ -448,13 +464,15 @@ function variables_function(parameters::NamedTuple)
             a = a_grid_c[a_i]
             κ_m = κ_grid_c[κ_m_i, h_size]
             κ_f = κ_grid_c[κ_f_i, h_size]
+            a_κ = a - κ_m - κ_f
+
             for n_m_i in 1i0:n_size, n_f_i in 1i0:n_size
                 n_m = n_grid[n_m_i]
                 n_f = n_grid[n_f_i]
                 l_m = T - n_m
                 l_f = T - n_f
-                c = h * e_m * n_m + h * e_f * n_f + a - κ_m - κ_f
-                u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ)
+                c = he_m * n_m + he_f * n_f + a_κ
+                u = utility_function(c / η, l_m, γ, ω) + utility_function(c / η, l_f, γ, ω)
                 if u > V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size]
                     V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = u
                     policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = n_m
@@ -473,9 +491,9 @@ function variables_function(parameters::NamedTuple)
     end
 
     # define pricing functions
-    q_s_m = ones(a_size, e_size, h_size - 1i0) ./ (1.0f0 + r_f)
-    q_s_f = ones(a_size, e_size, h_size - 1i0) ./ (1.0f0 + r_f)
-    q_c = ones(a_size, e_size, e_size, h_size - 1i0) ./ (1.0f0 + r_f)
+    q_s_m = ones(a_size, e_size, h_size - 1i0) ./ R_f
+    q_s_f = ones(a_size, e_size, h_size - 1i0) ./ R_f
+    q_c = ones(a_size, e_size, e_size, h_size - 1i0) ./ R_f
 
     # return outputs
     variables = Mutable_Variables(
@@ -498,7 +516,7 @@ function pricing_and_rbl_function!(
 
     # unpack parameters
     @unpack loop_q_s, loop_q_c, e_size, e_m_grid, e_m_Γ, e_f_grid, e_f_Γ, a_grid_neg, h_grid, κ_size, κ_grid = parameters
-    @unpack κ_Γ, r_f, τ, ϕ, ψ = parameters
+    @unpack κ_Γ, BR, ϕ, ψ = parameters
 
     # extract the life-cycle wage
     h_p = h_grid[h_i+1i0]
@@ -528,8 +546,8 @@ function pricing_and_rbl_function!(
         end
 
         # make sure the risk-based price is bounded between zero and one
-        variables.q_s_m[a_p_i, e_i, h_i] = clamp(variables.q_s_m[a_p_i, e_i, h_i], 0.0f0, 1.0f0) / (1.0f0 + r_f + τ)
-        variables.q_s_f[a_p_i, e_i, h_i] = clamp(variables.q_s_f[a_p_i, e_i, h_i], 0.0f0, 1.0f0) / (1.0f0 + r_f + τ)
+        variables.q_s_m[a_p_i, e_i, h_i] = clamp(variables.q_s_m[a_p_i, e_i, h_i], 0.0f0, 1.0f0) / BR
+        variables.q_s_f[a_p_i, e_i, h_i] = clamp(variables.q_s_f[a_p_i, e_i, h_i], 0.0f0, 1.0f0) / BR
     end
 
     # couple
@@ -564,7 +582,7 @@ function pricing_and_rbl_function!(
         end
 
         # make sure the risk-based price is bounded between zero and one
-        variables.q_c[a_p_i, e_f_i, e_m_i, h_i] = clamp(variables.q_c[a_p_i, e_f_i, e_m_i, h_i], 0.0f0, 1.0f0) / (1.0f0 + r_f + τ)
+        variables.q_c[a_p_i, e_f_i, e_m_i, h_i] = clamp(variables.q_c[a_p_i, e_f_i, e_m_i, h_i], 0.0f0, 1.0f0) / BR
     end
 
     # return results
@@ -617,7 +635,7 @@ function value_and_policy_function!(
 
     # unpack parameters
     @unpack loop_V_s, loop_V_c, h_grid, a_size, a_grid, a_grid_c, a_ind_zero, e_size, e_m_grid, e_f_grid, κ_grid, κ_grid_c, n_size, n_grid = parameters
-    @unpack T, γ, ω, ϕ, χ, κ_div, ψ, η = parameters
+    @unpack T, γ, ω, ϕ, κ_div, ψ, η = parameters
     @unpack κ_size = parameters
 
 
@@ -627,6 +645,7 @@ function value_and_policy_function!(
     # male
     for e_i in 1i0:e_size
         e_m = e_m_grid[e_i]
+        he_m = h * e_m
 
         # construct useful vectors
         @views qa_m = variables.q_s_m[:, e_i, h_i] .* a_grid
@@ -636,8 +655,8 @@ function value_and_policy_function!(
         for n_i in 1i0:n_size
             n = n_grid[n_i]
             l = T - n
-            c = h * e_m * n * (1.0f0 - ϕ)
-            u = utility_function(c, l, γ, ω, χ) + EV_m[a_ind_zero]
+            c = he_m * n * (1.0f0 - ϕ)
+            u = utility_function(c, l, γ, ω) + EV_m[a_ind_zero]
             if u > variables.V_s_m_d[e_i, h_i]
                 variables.V_s_m_d[e_i, h_i] = u
                 variables.policy_s_m_d_n[e_i, h_i] = n
@@ -648,16 +667,18 @@ function value_and_policy_function!(
         @batch for (κ_i, a_i) in loop_V_s
             a = a_grid[a_i]
             κ = κ_grid[κ_i, h_i]
+            a_κ = a - κ
 
             for n_i in 1i0:n_size
                 n = n_grid[n_i]
                 l = T - n
+                income = he_m * n + a_κ
 
                 for a_p_i in 1i0:a_size
 
                     # single
-                    c = h * e_m * n + a - κ - qa_m[a_p_i]
-                    u = utility_function(c, l, γ, ω, χ) + EV_m[a_p_i]
+                    c = income - qa_m[a_p_i]
+                    u = utility_function(c, l, γ, ω) + EV_m[a_p_i]
                     if u > variables.V_s_m_r[a_i, κ_i, e_i, h_i]
                         variables.V_s_m_r[a_i, κ_i, e_i, h_i] = u
                         variables.policy_s_m_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
@@ -666,7 +687,7 @@ function value_and_policy_function!(
 
                     # divorced
                     c = c - κ_div
-                    u = utility_function(c, l, γ, ω, χ) + EV_m[a_p_i]
+                    u = utility_function(c, l, γ, ω) + EV_m[a_p_i]
                     if u > variables.V_d_m_r[a_i, κ_i, e_i, h_i]
                         variables.V_d_m_r[a_i, κ_i, e_i, h_i] = u
                         variables.policy_d_m_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
@@ -696,6 +717,7 @@ function value_and_policy_function!(
     # female
     for e_i in 1i0:e_size
         e_f = e_f_grid[e_i]
+        he_f = h * e_f
 
         # construct useful vectors
         @views qa_f = variables.q_s_f[:, e_i, h_i] .* a_grid
@@ -705,8 +727,8 @@ function value_and_policy_function!(
         for n_i in 1i0:n_size
             n = n_grid[n_i]
             l = T - n
-            c = h * e_f * n * (1.0f0 - ϕ)
-            u = utility_function(c, l, γ, ω, χ) + EV_f[a_ind_zero]
+            c = he_f * n * (1.0f0 - ϕ)
+            u = utility_function(c, l, γ, ω) + EV_f[a_ind_zero]
             if u > variables.V_s_f_d[e_i, h_i]
                 variables.V_s_f_d[e_i, h_i] = u
                 variables.policy_s_f_d_n[e_i, h_i] = n
@@ -717,16 +739,18 @@ function value_and_policy_function!(
         @batch for (κ_i, a_i) in loop_V_s
             a = a_grid[a_i]
             κ = κ_grid[κ_i, h_i]
+            a_κ = a - κ
 
             for n_i in 1i0:n_size
                 n = n_grid[n_i]
                 l = T - n
+                income = he_f * n + a_κ
 
                 for a_p_i in 1i0:a_size
 
                     # single
-                    c = h * e_f * n + a - κ - qa_f[a_p_i]
-                    u = utility_function(c, l, γ, ω, χ) + EV_f[a_p_i]
+                    c = income - qa_f[a_p_i]
+                    u = utility_function(c, l, γ, ω) + EV_f[a_p_i]
                     if u > variables.V_s_f_r[a_i, κ_i, e_i, h_i]
                         variables.V_s_f_r[a_i, κ_i, e_i, h_i] = u
                         variables.policy_s_f_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
@@ -735,7 +759,7 @@ function value_and_policy_function!(
 
                     # divorced
                     c = c - κ_div
-                    u = utility_function(c, l, γ, ω, χ) + EV_f[a_p_i]
+                    u = utility_function(c, l, γ, ω) + EV_f[a_p_i]
                     if u > variables.V_d_f_r[a_i, κ_i, e_i, h_i]
                         variables.V_d_f_r[a_i, κ_i, e_i, h_i] = u
                         variables.policy_d_f_r_a[a_i, κ_i, e_i, h_i] = a_grid[a_p_i]
@@ -764,60 +788,66 @@ function value_and_policy_function!(
 
     # couple
     # loop over all states
-    # for e_m_i in 1i0:e_size, e_f_i in 1i0:e_size
-    #     e_m = e_m_grid[e_m_i]
-    #     e_f = e_f_grid[e_f_i]
+    for e_m_i in 1i0:e_size, e_f_i in 1i0:e_size
+        e_m = e_m_grid[e_m_i]
+        he_m = h * e_m
+        e_f = e_f_grid[e_f_i]
+        he_f = h * e_f
 
-    #     # construct useful vectors
-    #     @views qa_c = variables.q_c[:, e_f_i, e_m_i, h_i] .* a_grid_c
-    #     @views EV_c = variables.E_V_c[:, e_f_i, e_m_i, h_i]
+        # construct useful vectors
+        @views qa_c = variables.q_c[:, e_f_i, e_m_i, h_i] .* a_grid_c
+        @views EV_c = variables.E_V_c[:, e_f_i, e_m_i, h_i]
 
-    #     # default
-    #     for n_m_i in 1i0:n_size, n_f_i in 1i0:n_size
-    #         n_m = n_grid[n_m_i]
-    #         n_f = n_grid[n_f_i]
-    #         l_m = T - n_m
-    #         l_f = T - n_f
-    #         c = (h * e_m * n_m + h * e_f * n_f) * (1.0f0 - ϕ)
-    #         u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ) + EV_c[a_ind_zero]
-    #         if u > variables.V_c_d[e_f_i, e_m_i, h_i]
-    #             variables.V_c_d[e_f_i, e_m_i, h_i] = u
-    #             variables.policy_c_d_n_m[e_f_i, e_m_i, h_i] = n_m
-    #             variables.policy_c_d_n_f[e_f_i, e_m_i, h_i] = n_f
-    #         end
-    #     end
+        # default
+        for n_m_i in 1i0:n_size, n_f_i in 1i0:n_size
+            n_m = n_grid[n_m_i]
+            n_f = n_grid[n_f_i]
+            l_m = T - n_m
+            l_f = T - n_f
+            c = (he_m * n_m + he_f * n_f) * (1.0f0 - ϕ)
+            u = utility_function(c / η, l_m, l_f, γ, ω) + EV_c[a_ind_zero]
+            if u > variables.V_c_d[e_f_i, e_m_i, h_i]
+                variables.V_c_d[e_f_i, e_m_i, h_i] = u
+                variables.policy_c_d_n_m[e_f_i, e_m_i, h_i] = n_m
+                variables.policy_c_d_n_f[e_f_i, e_m_i, h_i] = n_f
+            end
+        end
 
-    #     # repayment
-    #     for κ_m_i in 1i0:κ_size, κ_f_i in 1i0:κ_size, a_i in 1i0:a_size
-    #         a = a_grid_c[a_i]
-    #         κ_m = κ_grid_c[κ_m_i, h_i]
-    #         κ_f = κ_grid_c[κ_f_i, h_i]
-    #         for n_m_i in 1i0:n_size, n_f_i in 1i0:n_size
-    #             n_m = n_grid[n_m_i]
-    #             n_f = n_grid[n_f_i]
-    #             l_m = T - n_m
-    #             l_f = T - n_f
-    #             for a_p_i in 1i0:a_size
-    #                 c = h * e_m * n_m + h * e_f * n_f + a - κ_m - κ_f - qa_c[a_p_i]
-    #                 u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ) + EV_c[a_p_i]
-    #                 if u > variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
-    #                     variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = u
-    #                     variables.policy_c_r_a[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = a_grid_c[a_p_i]
-    #                     variables.policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_m
-    #                     variables.policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_f
-    #                 end
-    #             end
-    #         end
+        # repayment
+        # for κ_m_i in 1i0:κ_size, κ_f_i in 1i0:κ_size, a_i in 1i0:a_size
+        @batch for (κ_m_i, κ_f_i, a_i) in loop_V_c
+            a = a_grid_c[a_i]
+            κ_m = κ_grid_c[κ_m_i, h_i]
+            κ_f = κ_grid_c[κ_f_i, h_i]
+            a_κ = a - κ_m - κ_f
 
-    #         # to default or not
-    #         if variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] <= variables.V_c_d[e_f_i, e_m_i, h_i]
-    #             variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_d[e_f_i, e_m_i, h_i]
-    #             variables.policy_c_d[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = 1.0f0
-    #         else
-    #             variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
-    #         end
-    #     end
-    # end
+            for n_m_i in 1i0:n_size, n_f_i in 1i0:n_size
+                n_m = n_grid[n_m_i]
+                n_f = n_grid[n_f_i]
+                l_m = T - n_m
+                l_f = T - n_f
+                income = he_m * n_m + he_f * n_f + a_κ
+                for a_p_i in 1i0:a_size
+                    c = income - qa_c[a_p_i]
+                    u = utility_function(c / η, l_m, l_f, γ, ω) + EV_c[a_p_i]
+                    if u > variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
+                        variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = u
+                        variables.policy_c_r_a[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = a_grid_c[a_p_i]
+                        variables.policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_m
+                        variables.policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_f
+                    end
+                end
+            end
+
+            # to default or not
+            if variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] <= variables.V_c_d[e_f_i, e_m_i, h_i]
+                variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_d[e_f_i, e_m_i, h_i]
+                variables.policy_c_d[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = 1.0f0
+            else
+                variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
+            end
+        end
+    end
 
     # return results
     return nothing
@@ -835,8 +865,7 @@ function solve_function!(
     @unpack life_span = parameters
 
     # loop over life span
-    # @showprogress dt = 1i0 desc = "Computing..." 
-    for h_i = (life_span-1i0):(-1i0):1i0
+    @showprogress dt = 1i0 desc = "Computing..." for h_i = (life_span-1i0):(-1i0):1i0
         pricing_and_rbl_function!(h_i, variables, parameters)
         E_V_function!(h_i, variables, parameters)
         value_and_policy_function!(h_i, variables, parameters)
@@ -888,13 +917,13 @@ for e_i in 1:parameters.e_size
 end
 plot_q_s
 
-# h_i = parameters.h_size - 1
-# plot_q_c = plot(bg=:black, legend=:none, box=:on, ylims=(0.0, 1.0))
-# for e_i in 1:parameters.e_size
-#     plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 1, h_i], color=e_i)
-#     plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 5, h_i], color=e_i, linestyle=:dash)
-# end
-# plot_q_c
+h_i = parameters.h_size - 12
+plot_q_c = plot(bg=:black, legend=:none, box=:on, ylims=(0.0, 1.0))
+for e_i in 1:parameters.e_size
+    plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 1, h_i], color=e_i)
+    plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 5, h_i], color=e_i, linestyle=:dash)
+end
+plot_q_c
 
 # plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-3] .* parameters.a_grid_neg)
 # plot(parameters.a_grid, variables.q_s_m[:, :, end] .* parameters.a_grid)
