@@ -756,60 +756,60 @@ function value_and_policy_function!(
 
     # couple
     # loop over all states
-    for e_m_i in 1:e_size, e_f_i in 1:e_size
-        @inbounds e_m = e_m_grid[e_m_i]
-        @inbounds e_f = e_f_grid[e_f_i]
+    # for e_m_i in 1:e_size, e_f_i in 1:e_size
+    #     @inbounds e_m = e_m_grid[e_m_i]
+    #     @inbounds e_f = e_f_grid[e_f_i]
 
-        # construct useful vectors
-        @inbounds @views qa_c = variables.q_c[:, e_f_i, e_m_i, h_i] .* a_grid_c
-        @inbounds @views EV_c = variables.E_V_c[:, e_f_i, e_m_i, h_i]
+    #     # construct useful vectors
+    #     @inbounds @views qa_c = variables.q_c[:, e_f_i, e_m_i, h_i] .* a_grid_c
+    #     @inbounds @views EV_c = variables.E_V_c[:, e_f_i, e_m_i, h_i]
 
-        # default
-        for n_m_i in 1:n_size, n_f_i in 1:n_size
-            @inbounds n_m = n_grid[n_m_i]
-            @inbounds n_f = n_grid[n_f_i]
-            l_m = T - n_m
-            l_f = T - n_f
-            c = (h * e_m * n_m + h * e_f * n_f) * (1.0 - ϕ)
-            @inbounds u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ) + EV_c[a_ind_zero]
-            if u > variables.V_c_d[e_f_i, e_m_i, h_i]
-                @inbounds variables.V_c_d[e_f_i, e_m_i, h_i] = u
-                @inbounds variables.policy_c_d_n_m[e_f_i, e_m_i, h_i] = n_m
-                @inbounds variables.policy_c_d_n_f[e_f_i, e_m_i, h_i] = n_f
-            end
-        end
+    #     # default
+    #     for n_m_i in 1:n_size, n_f_i in 1:n_size
+    #         @inbounds n_m = n_grid[n_m_i]
+    #         @inbounds n_f = n_grid[n_f_i]
+    #         l_m = T - n_m
+    #         l_f = T - n_f
+    #         c = (h * e_m * n_m + h * e_f * n_f) * (1.0 - ϕ)
+    #         @inbounds u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ) + EV_c[a_ind_zero]
+    #         if u > variables.V_c_d[e_f_i, e_m_i, h_i]
+    #             @inbounds variables.V_c_d[e_f_i, e_m_i, h_i] = u
+    #             @inbounds variables.policy_c_d_n_m[e_f_i, e_m_i, h_i] = n_m
+    #             @inbounds variables.policy_c_d_n_f[e_f_i, e_m_i, h_i] = n_f
+    #         end
+    #     end
 
-        # repayment
-        for κ_m_i in 1:κ_size, κ_f_i in 1:κ_size, a_i in 1:a_size
-            @inbounds a = a_grid_c[a_i]
-            @inbounds κ_m = κ_grid_c[κ_m_i, h_i]
-            @inbounds κ_f = κ_grid_c[κ_f_i, h_i]
-            for n_m_i in 1:n_size, n_f_i in 1:n_size
-                @inbounds n_m = n_grid[n_m_i]
-                @inbounds n_f = n_grid[n_f_i]
-                l_m = T - n_m
-                l_f = T - n_f
-                for a_p_i in 1:a_size
-                    @inbounds c = h * e_m * n_m + h * e_f * n_f + a - κ_m - κ_f - qa_c[a_p_i]
-                    @inbounds u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ) + EV_c[a_p_i]
-                    if u > variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
-                        @inbounds variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = u
-                        @inbounds variables.policy_c_r_a[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = a_grid_c[a_p_i]
-                        @inbounds variables.policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_m
-                        @inbounds variables.policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_f
-                    end
-                end
-            end
+    #     # repayment
+    #     for κ_m_i in 1:κ_size, κ_f_i in 1:κ_size, a_i in 1:a_size
+    #         @inbounds a = a_grid_c[a_i]
+    #         @inbounds κ_m = κ_grid_c[κ_m_i, h_i]
+    #         @inbounds κ_f = κ_grid_c[κ_f_i, h_i]
+    #         for n_m_i in 1:n_size, n_f_i in 1:n_size
+    #             @inbounds n_m = n_grid[n_m_i]
+    #             @inbounds n_f = n_grid[n_f_i]
+    #             l_m = T - n_m
+    #             l_f = T - n_f
+    #             for a_p_i in 1:a_size
+    #                 @inbounds c = h * e_m * n_m + h * e_f * n_f + a - κ_m - κ_f - qa_c[a_p_i]
+    #                 @inbounds u = utility_function(c / η, l_m, γ, ω, χ) + utility_function(c / η, l_f, γ, ω, χ) + EV_c[a_p_i]
+    #                 if u > variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
+    #                     @inbounds variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = u
+    #                     @inbounds variables.policy_c_r_a[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = a_grid_c[a_p_i]
+    #                     @inbounds variables.policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_m
+    #                     @inbounds variables.policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = n_f
+    #                 end
+    #             end
+    #         end
 
-            # to default or not
-            if variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] <= variables.V_c_d[e_f_i, e_m_i, h_i]
-                @inbounds variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_d[e_f_i, e_m_i, h_i]
-                @inbounds variables.policy_c_d[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = 1.0
-            else
-                @inbounds variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
-            end
-        end
-    end
+    #         # to default or not
+    #         if variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] <= variables.V_c_d[e_f_i, e_m_i, h_i]
+    #             @inbounds variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_d[e_f_i, e_m_i, h_i]
+    #             @inbounds variables.policy_c_d[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = 1.0
+    #         else
+    #             @inbounds variables.V_c[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i] = variables.V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_i]
+    #         end
+    #     end
+    # end
 
     # return results
     return nothing
@@ -871,21 +871,21 @@ solve_function!(variables, parameters);
 
 # cheching figures
 using Plots
-# h_i = parameters.h_size - 10
-# plot_q_s = plot(bg=:black, legend=:none, box=:on, ylims=(0.0, 1.0))
-# for e_i in 1:parameters.e_size
-#     plot!(plot_q_s, parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, e_i, h_i], color=e_i)
-#     plot!(plot_q_s, parameters.a_grid_neg, variables.q_s_f[1:parameters.a_ind_zero, e_i, h_i], color=e_i, linestyle=:dash)
-# end
-# plot_q_s
-
-h_i = 2 # parameters.h_size - 3
-plot_q_c = plot(bg=:black, legend=:none, box=:on, ylims=(0.0, 1.0))
+h_i = parameters.h_size - 1
+plot_q_s = plot(bg=:black, legend=:none, box=:on, ylims=(0.0, 1.0))
 for e_i in 1:parameters.e_size
-    plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 1, h_i], color=e_i)
-    plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 5, h_i], color=e_i, linestyle=:dash)
+    plot!(plot_q_s, parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, e_i, h_i], color=e_i)
+    plot!(plot_q_s, parameters.a_grid_neg, variables.q_s_f[1:parameters.a_ind_zero, e_i, h_i], color=e_i, linestyle=:dash)
 end
-plot_q_c
+plot_q_s
+
+# h_i = 2 # parameters.h_size - 3
+# plot_q_c = plot(bg=:black, legend=:none, box=:on, ylims=(0.0, 1.0))
+# for e_i in 1:parameters.e_size
+#     plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 1, h_i], color=e_i)
+#     plot!(plot_q_c, parameters.a_grid_neg_c, variables.q_c[1:parameters.a_ind_zero, e_i, 5, h_i], color=e_i, linestyle=:dash)
+# end
+# plot_q_c
 
 # plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-3] .* parameters.a_grid_neg)
 # plot(parameters.a_grid, variables.q_s_m[:, :, end] .* parameters.a_grid)
