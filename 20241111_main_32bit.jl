@@ -323,10 +323,12 @@ function variables_function(parameters::NamedTuple)
             n = n_grid[n_i]
             l = T - n
             c = he_m * n * (1.0f0 - ϕ)
-            u = utility_function.(c, l, γ, ω)
-            if u > V_s_m_d[e_i, h_size]
-                V_s_m_d[e_i, h_size] = u
-                policy_s_m_d_n[e_i, h_size] = n
+            if c > 0.0f0
+                u = utility_function.(c, l, γ, ω)
+                if u > V_s_m_d[e_i, h_size]
+                    V_s_m_d[e_i, h_size] = u
+                    policy_s_m_d_n[e_i, h_size] = n
+                end
             end
         end
 
@@ -342,18 +344,22 @@ function variables_function(parameters::NamedTuple)
 
                 # single
                 c = he_m * n + a_κ
-                u = utility_function(c, l, γ, ω)
-                if u > V_s_m_r[a_i, κ_i, e_i, h_size]
-                    V_s_m_r[a_i, κ_i, e_i, h_size] = u
-                    policy_s_m_r_n[a_i, κ_i, e_i, h_size] = n
+                if c > 0.0f0
+                    u = utility_function(c, l, γ, ω)
+                    if u > V_s_m_r[a_i, κ_i, e_i, h_size]
+                        V_s_m_r[a_i, κ_i, e_i, h_size] = u
+                        policy_s_m_r_n[a_i, κ_i, e_i, h_size] = n
+                    end
                 end
 
                 # divorced
                 c = c - κ_div
-                u = utility_function(c, l, γ, ω)
-                if u > V_d_m_r[a_i, κ_i, e_i, h_size]
-                    V_d_m_r[a_i, κ_i, e_i, h_size] = u
-                    policy_d_m_r_n[a_i, κ_i, e_i, h_size] = n
+                if c > 0.0f0
+                    u = utility_function(c, l, γ, ω)
+                    if u > V_d_m_r[a_i, κ_i, e_i, h_size]
+                        V_d_m_r[a_i, κ_i, e_i, h_size] = u
+                        policy_d_m_r_n[a_i, κ_i, e_i, h_size] = n
+                    end
                 end
             end
 
@@ -385,10 +391,12 @@ function variables_function(parameters::NamedTuple)
             n = n_grid[n_i]
             l = T - n
             c = he_f * n * (1.0f0 - ϕ)
-            u = utility_function.(c, l, γ, ω)
-            if u > V_s_f_d[e_i, h_size]
-                V_s_f_d[e_i, h_size] = u
-                policy_s_f_d_n[e_i, h_size] = n
+            if c > 0.0f0
+                u = utility_function.(c, l, γ, ω)
+                if u > V_s_f_d[e_i, h_size]
+                    V_s_f_d[e_i, h_size] = u
+                    policy_s_f_d_n[e_i, h_size] = n
+                end
             end
         end
 
@@ -404,18 +412,22 @@ function variables_function(parameters::NamedTuple)
 
                 # single
                 c = he_f * n + a_κ
-                u = utility_function(c, l, γ, ω)
-                if u > V_s_f_r[a_i, κ_i, e_i, h_size]
-                    V_s_f_r[a_i, κ_i, e_i, h_size] = u
-                    policy_s_f_r_n[a_i, κ_i, e_i, h_size] = n
+                if c > 0.0f0
+                    u = utility_function(c, l, γ, ω)
+                    if u > V_s_f_r[a_i, κ_i, e_i, h_size]
+                        V_s_f_r[a_i, κ_i, e_i, h_size] = u
+                        policy_s_f_r_n[a_i, κ_i, e_i, h_size] = n
+                    end
                 end
 
                 # divorced
                 c = c - κ_div
-                u = utility_function(c, l, γ, ω)
-                if u > V_d_f_r[a_i, κ_i, e_i, h_size]
-                    V_d_f_r[a_i, κ_i, e_i, h_size] = u
-                    policy_d_f_r_n[a_i, κ_i, e_i, h_size] = n
+                if c > 0.0f0
+                    u = utility_function(c, l, γ, ω)
+                    if u > V_d_f_r[a_i, κ_i, e_i, h_size]
+                        V_d_f_r[a_i, κ_i, e_i, h_size] = u
+                        policy_d_f_r_n[a_i, κ_i, e_i, h_size] = n
+                    end
                 end
             end
 
@@ -451,11 +463,13 @@ function variables_function(parameters::NamedTuple)
             l_m = T - n_m
             l_f = T - n_f
             c = (he_m * n_m + he_f * n_f) * (1.0f0 - ϕ)
-            u = utility_function(c / η, l_m, γ, ω) + utility_function(c / η, l_f, γ, ω)
-            if u > V_c_d[e_f_i, e_m_i, h_size]
-                V_c_d[e_f_i, e_m_i, h_size] = u
-                policy_c_d_n_m[e_f_i, e_m_i, h_size] = n_m
-                policy_c_d_n_f[e_f_i, e_m_i, h_size] = n_f
+            if c > 0.0f0
+                u = utility_function(c / η, l_m, γ, ω) + utility_function(c / η, l_f, γ, ω)
+                if u > V_c_d[e_f_i, e_m_i, h_size]
+                    V_c_d[e_f_i, e_m_i, h_size] = u
+                    policy_c_d_n_m[e_f_i, e_m_i, h_size] = n_m
+                    policy_c_d_n_f[e_f_i, e_m_i, h_size] = n_f
+                end
             end
         end
 
@@ -472,11 +486,13 @@ function variables_function(parameters::NamedTuple)
                 l_m = T - n_m
                 l_f = T - n_f
                 c = he_m * n_m + he_f * n_f + a_κ
-                u = utility_function(c / η, l_m, γ, ω) + utility_function(c / η, l_f, γ, ω)
-                if u > V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size]
-                    V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = u
-                    policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = n_m
-                    policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = n_f
+                if c > 0.0f0
+                    u = utility_function(c / η, l_m, γ, ω) + utility_function(c / η, l_f, γ, ω)
+                    if u > V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size]
+                        V_c_r[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = u
+                        policy_c_r_n_m[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = n_m
+                        policy_c_r_n_f[a_i, κ_f_i, κ_m_i, e_f_i, e_m_i, h_size] = n_f
+                    end
                 end
             end
 
