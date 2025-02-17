@@ -957,6 +957,14 @@ for e_i in 1:parameters.e_size
 end
 plot_q_c
 
+h_i = 4
+e_i = 1
+plot_q_c_s = plot(legend=:none, box=:on, ylims=(0.0, 1.0))
+plot!(plot_q_c_s, parameters.a_grid_neg, variables.q_s_f[1:parameters.a_ind_zero, e_i, h_i], color=e_i)
+plot!(plot_q_c_s, parameters.a_grid_neg, variables.q_c[1:parameters.a_ind_zero, e_i, :, h_i] * parameters.e_f_G, color=e_i, linestyle=:dash)
+# plot!(plot_q_c_s, parameters.a_grid_neg, variables.q_c[1:parameters.a_ind_zero, e_i, 1, h_i], color=e_i, linestyle=:dash)
+plot_q_c_s
+
 # plot(parameters.a_grid_neg, variables.q_s_m[1:parameters.a_ind_zero, :, end-3] .* parameters.a_grid_neg)
 # plot(parameters.a_grid, variables.q_s_m[:, :, end] .* parameters.a_grid)
 
